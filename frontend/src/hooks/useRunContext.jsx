@@ -6,15 +6,15 @@ const BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 const RunContext = createContext(null)
 
 export function RunProvider({ children }) {
-  const [running, setRunning]     = useState(false)
-  const [done, setDone]           = useState(false)
-  const [status, setStatus]       = useState(null)
-  const [events, setEvents]       = useState([])
+  const [running, setRunning] = useState(false)
+  const [done, setDone] = useState(false)
+  const [status, setStatus] = useState(null)
+  const [events, setEvents] = useState([])
   const [concurrency, setConcurrency] = useState(3)
 
-  const esRef       = useRef(null)
-  const pollRef     = useRef(null)
-  const mountedRef  = useRef(true)
+  const esRef = useRef(null)
+  const pollRef = useRef(null)
+  const mountedRef = useRef(true)
 
   useEffect(() => {
     mountedRef.current = true
@@ -29,7 +29,7 @@ export function RunProvider({ children }) {
       } else if (d.processed > 0) {
         setDone(true)
       }
-    }).catch(() => {})
+    }).catch(() => { })
 
     return () => {
       mountedRef.current = false
@@ -59,7 +59,7 @@ export function RunProvider({ children }) {
           setRunning(false)
           if (d.processed > 0) setDone(true)
         }
-      } catch {}
+      } catch { }
     }, 1500)
   }, [])
 
@@ -92,7 +92,7 @@ export function RunProvider({ children }) {
         } else {
           setEvents(prev => [...prev, data])
         }
-      } catch {}
+      } catch { }
     }
 
     es.onerror = () => {
@@ -110,13 +110,13 @@ export function RunProvider({ children }) {
       setRunning(false)
       clearInterval(pollRef.current)
       esRef.current?.close()
-    } catch {}
+    } catch { }
   }, [])
 
   const reset = useCallback(async () => {
     esRef.current?.close()
     clearInterval(pollRef.current)
-    try { await axios.delete(`${BASE}/audit`) } catch {}
+    try { await axios.delete(`${BASE}/audit`) } catch { }
     setEvents([])
     setStatus(null)
     setDone(false)

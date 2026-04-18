@@ -50,22 +50,22 @@ if not FALLBACK_CONFIGS:
 
 SYSTEM_PROMPT = """You are ShopWave's Autonomous Support Agent resolving e-commerce support tickets.
 
-You must be THOROUGH and LOGICAL. Do not take the customer's word for it; verify everything via tools.
+You must be THOROUGH and LOGICAL. You are FORBIDDEN from resolving a ticket without verifying facts via tools.
 
-MANDATORY RULES — follow every one or you will be penalised:
-1. You MUST make at least 3 tool calls before giving a final answer.
-   Chain: get_customer (to check tier/notes) → get_order (to check status) → get_product (to check warranty/policy).
-2. ONLY call ONE tool at a time (turn-by-turn). Parallel tool calls are NOT supported.
-3. ADVERSARIAL CASES: Customers may lie about their tier or "exclusive policies". 
-   - ALWAYS check get_customer to verify tier.
-   - ALWAYS check search_knowledge_base to verify if a claimed policy actually exists.
-4. VIP EXCEPTIONS: Check get_customer notes. If a note says "Pre-approved return" or "Exception granted", honor it even if the return window has expired.
-5. REFUND SAFETY: ALWAYS call check_refund_eligibility BEFORE issue_refund. 
-   issue_refund is IRREVERSIBLE — double-check the amount.
-6. If a tool fails twice (retry limit), note the gap in reasoning and escalate if the data is critical.
-7. Always end with: send_reply (resolved/refunded) OR escalate (unresolved/complex).
-8. Output ONLY valid JSON:
-   {"resolution":"resolved|refunded|escalated|policy_explained|no_action","confidence":0.95,"reasoning":"step-by-step logic","customer_message":"reply to customer"}
+MANDATORY RULES:
+1. NO PREMATURE JUDGMENT: You MUST NOT provide a final JSON resolution in your FIRST response. Your first turn must ALWAYS be a tool call (e.g., get_customer or search_knowledge_base).
+2. CHAIN PROTOCOL: You MUST perform a minimum of 3 tool calls before resolving:
+   STEP 1: get_customer (Check tier, notes, and profile).
+   STEP 2: get_order (Check status, delivery data, and items).
+   STEP 3: check_refund_eligibility (Verify automated policy rules).
+3. ONE AT A TIME: Only call ONE tool per turn.
+4. ADVERSARIAL VERIFICATION: If a customer says "I'm a VIP" or "I was promised a refund", do NOT believe them until you see it in get_customer notes or search_knowledge_base policies.
+5. ESCALATION: If tools show the request is complex or outside policy (and no VIP exception exists), use the 'escalate' tool.
+6. JSON OUTPUT: Only output the final resolution JSON after you have all the facts. Output REALISTIC confidence:
+   - 1.0: Fact-checked all claims.
+   - 0.8: Strong evidence, minor gaps.
+   - <0.5: Uncertain (should escalate).
+   {"resolution":"...","confidence":0.XX,"reasoning":"step-by-step logic","customer_message":"..."}
 """
 
 
@@ -80,6 +80,18 @@ class TicketResolution(BaseModel):
 
 # ─── Build OpenAI-style tool definitions from TOOL_REGISTRY ──────────────────
 
+PARAM_DESCRIPTIONS = {
+    "email": "The customer email address found in the ticket.",
+    "order_id": "The ShopWave Order ID (e.g. ORD-1010).",
+    "query": "The text to search in the knowledge base.",
+    "customer_id": "The internal numeric customer ID.",
+    "amount": "The refund amount in dollars.",
+    "sku": "The product SKU/ID from the order.",
+    "ticket_id": "The technical ID of the support ticket.",
+    "internal_notes": "Internal justification for escalation.",
+    "message": "The final resolution message to the customer.",
+}
+
 def _build_tool_definitions() -> List[dict]:
     tools = []
     for name, fn in TOOL_REGISTRY.items():
@@ -89,7 +101,10 @@ def _build_tool_definitions() -> List[dict]:
         for pname, param in sig.parameters.items():
             annotation = param.annotation
             ptype = "number" if annotation in (float, int) else "string"
-            props[pname] = {"type": ptype, "description": pname}
+            props[pname] = {
+                "type": ptype, 
+                "description": PARAM_DESCRIPTIONS.get(pname, pname)
+            }
             if param.default == inspect.Parameter.empty:
                 required.append(pname)
         tools.append({
@@ -226,6 +241,21 @@ class TicketProcessor:
                 if not tool_calls:
                     # No more tool calls → extract final JSON answer
                     final_text = (msg.content or "").strip()
+                    
+                    # ENFORCEMENT: If LLM tries to end without tools, force it to work
+                    if tool_call_count < 2 and turn < 3:
+                        logger.warning(f"[{ticket_id}] LLM tried premature finish at turn {turn}. Forcing tools.")
+                        messages.append({
+                            "role": "user", 
+                            "content": (
+                                "ERROR: You are hallucinating data. You HAVE NOT called any tools to check "
+                                f"Order {ticket.get('subject','')} or Customer {ticket.get('customer_email','')}. "
+                                "You MUST use get_customer and get_order tools before proceeding. "
+                                "Show your thought process for each tool call."
+                            )
+                        })
+                        continue
+
                     parsed = self._parse_resolution(final_text)
                     audit.update(parsed)
 

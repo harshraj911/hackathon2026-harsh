@@ -111,7 +111,10 @@ Every ticket triggers at minimum 3 tool calls in sequence:
 All tool calls are wrapped in retry logic with backoff. The agent also implements a **Multi-Model Fallback Matrix**: if the primary model hits a rate limit (429), capability error (e.g., "single tool-calls only"), or 5xx error, it automatically rotates to the next available model in the NVIDIA NIM cluster (Llama-3.1-405B, Nemotron-70B, etc.).
 
 ### Concurrency
-`process_all_tickets()` uses `asyncio.Semaphore` to process N tickets in parallel. Tool calls within a single ticket also run concurrently via `asyncio.gather()`.
+`process_all_tickets()` uses `asyncio.Semaphore` to process tickets in parallel. 
+
+> [!NOTE]
+> For this demonstration, the default concurrency is set to **2 simultaneous tickets** to respect NVIDIA NIM public API rate limits. However, the architecture is fully scalable; with a dedicated LLM deployment or higher-tier API keys, the agent can handle 50+ concurrent requests by simply adjusting the `concurrency_limit` setting.
 
 ### Explain
 Every resolution includes:

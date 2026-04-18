@@ -66,6 +66,10 @@ class RunRequest(BaseModel):
 class SingleTicketRequest(BaseModel):
     ticket_id: str
 
+class DataUpdateRequest(BaseModel):
+    filename: str  # tickets.json, orders.json, customers.json, products.json
+    content: list[dict]
+
 
 # ─── HEALTH ───
 
@@ -285,6 +289,38 @@ async def reset_audit():
     _progress_events.clear()
     _run_status.update({"running": False, "started_at": None, "completed_at": None})
     return {"message": "Audit log cleared"}
+
+
+# ─── DATA MANAGEMENT ───
+
+@app.get("/data/files/{filename}")
+async def get_data_file(filename: str):
+    """Retrieve raw content of a data file."""
+    valid_files = ["tickets.json", "orders.json", "customers.json", "products.json"]
+    if filename not in valid_files:
+        raise HTTPException(status_code=400, detail="Invalid filename")
+    
+    file_path = os.path.join(os.getcwd(), "data", filename)
+    try:
+        with open(file_path, "r") as f:
+            return json.load(f)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error reading file: {e}")
+
+@app.post("/data/files")
+async def update_data_file(req: DataUpdateRequest):
+    """Overwrite a data file with new content."""
+    valid_files = ["tickets.json", "orders.json", "customers.json", "products.json"]
+    if req.filename not in valid_files:
+        raise HTTPException(status_code=400, detail="Invalid filename")
+    
+    file_path = os.path.join(os.getcwd(), "data", req.filename)
+    try:
+        with open(file_path, "w") as f:
+            json.dump(req.content, f, indent=2)
+        return {"success": True, "message": f"Updated {req.filename}"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error writing file: {e}")
 
 
 # ─── DATA ENDPOINTS ───

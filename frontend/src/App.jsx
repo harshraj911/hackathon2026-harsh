@@ -7,6 +7,7 @@ import TicketList from './pages/TicketList'
 import TicketDetail from './pages/TicketDetail'
 import AuditLog from './pages/AuditLog'
 import RunAgent from './pages/RunAgent'
+import DataManagement from './pages/DataManagement'
 
 export default function App() {
   return (
@@ -18,6 +19,7 @@ export default function App() {
           <Route path="/tickets/:id" element={<TicketDetail />} />
           <Route path="/audit"       element={<AuditLog />} />
           <Route path="/run"         element={<RunAgent />} />
+          <Route path="/data"        element={<DataManagement />} />
         </Routes>
       </Layout>
     </RunProvider>

@@ -231,7 +231,7 @@ async def check_refund_eligibility(order_id: str) -> dict:
             "eligible": False,
             "order_id": order_id,
             "reason": f"Order is in '{order['status']}' status — cannot refund before delivery",
-            "confidence": 0.95,
+            "confidence": 1.0,
         }
 
     # Check return deadline
@@ -243,7 +243,7 @@ async def check_refund_eligibility(order_id: str) -> dict:
                 "order_id": order_id,
                 "reason": f"Return window expired on {order['return_deadline']}",
                 "deadline": order["return_deadline"],
-                "confidence": 0.95,
+                "confidence": 1.0,
             }
 
     return {

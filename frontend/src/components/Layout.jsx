@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard, Ticket, ScrollText, Play,
-  Zap, Activity, Menu, X, Github, ChevronRight
+  Zap, Activity, Menu, X, Github, ChevronRight, Database
 } from 'lucide-react'
 import { getHealth } from '../utils/api'
 
@@ -11,6 +11,7 @@ const NAV = [
   { to: '/run',     icon: Play,            label: 'Run Agent' },
   { to: '/tickets', icon: Ticket,          label: 'Tickets' },
   { to: '/audit',   icon: ScrollText,      label: 'Audit Log' },
+  { to: '/data',    icon: Database,        label: 'Data Source' },
 ]
 
 export default function Layout({ children }) {

@@ -28,6 +28,9 @@ export default function RunAgent() {
   }, [])
 
   const eventsEndRef = React.useRef(null)
+  React.useEffect(() => {
+    eventsEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [events])
 
   const completedCount = events.filter(e => e.status === 'completed').length
   const failedCount    = events.filter(e => ['failed', 'dead_letter'].includes(e.status)).length
