@@ -20,16 +20,15 @@ An AI agent that autonomously resolves 20 ShopWave customer support tickets end-
 │  ┌─────────────────────────────────────────────────┐    │
 │  │          TicketProcessor (asyncio)               │    │
 │  │  • Semaphore-limited concurrency (N parallel)    │    │
-│  │  • Agentic loop (tool_use → results → repeat)    │    │
-│  │  • Retry with exponential backoff                │    │
+│  │  • Agentic loop with robust ReAct pattern        │    │
+│  │  • Multi-model fallback matrix (NVIDIA NIM)      │    │
 │  │  • Dead-letter queue for failed tickets          │    │
-│  │  • Confidence scoring + auto-escalation          │    │
 │  └──────────────────┬──────────────────────────────┘    │
 │                     │                                    │
 │  ┌──────────────────▼──────────────────────────────┐    │
-│  │        Claude claude-sonnet-4-20250514 (LLM)             │    │
-│  │  • System prompt with full decision rules        │    │
-│  │  • Multi-turn tool-calling loop                  │    │
+│  │        NVIDIA NIM — Multi-Model Cluster          │    │
+│  │  • Primary: Llama-3.3-70b-instruct               │    │
+│  │  • Fallback: Llama-3.1-405b / Nemotron-70b       │    │
 │  │  • Structured JSON resolution output             │    │
 │  └──────────────────┬──────────────────────────────┘    │
 │                     │                                    │
@@ -51,7 +50,7 @@ An AI agent that autonomously resolves 20 ShopWave customer support tickets end-
 ### Prerequisites
 - Python 3.12+
 - Node.js 18+
-- An Anthropic API key
+- An NVIDIA NIM API Key (via integrate.api.nvidia.com)
 
 ### 1. Clone the repo
 ```bash
@@ -65,7 +64,11 @@ cd backend
 pip install -r requirements.txt
 
 # Set your API key
-export ANTHROPIC_API_KEY=sk-ant-...
+export NVIDIA_API_KEY=nvapi-...
+
+# Optional Fallbacks
+export NVIDIA_API_KEY_FALLBACK_1=nvapi-...
+export NVIDIA_API_KEY_FALLBACK_2=nvapi-...
 
 # Start the server
 uvicorn main:app --reload --port 8000
@@ -90,7 +93,7 @@ npm run dev
 
 | Layer | Technology |
 |---|---|
-| LLM | Claude claude-sonnet-4-20250514 (Anthropic) |
+| LLM | NVIDIA NIM Cluster (Llama-3.3-70b / Llama-3.1-405b) |
 | Backend | FastAPI + asyncio (Python 3.12) |
 | Frontend | React 18 + Vite + Recharts |
 | Deployment | Railway (backend) + Vercel (frontend) |
@@ -105,7 +108,7 @@ Every ticket triggers at minimum 3 tool calls in sequence:
 `get_customer → get_order → get_product → check_refund_eligibility → issue_refund/send_reply/escalate`
 
 ### Recover
-All tool calls are wrapped in retry logic with exponential backoff (up to 2 retries). 8% of tool calls simulate random failures and 5% simulate timeouts. Failed tools are logged and the agent continues reasoning with available data.
+All tool calls are wrapped in retry logic with backoff. The agent also implements a **Multi-Model Fallback Matrix**: if the primary model hits a rate limit (429), capability error (e.g., "single tool-calls only"), or 5xx error, it automatically rotates to the next available model in the NVIDIA NIM cluster (Llama-3.1-405B, Nemotron-70B, etc.).
 
 ### Concurrency
 `process_all_tickets()` uses `asyncio.Semaphore` to process N tickets in parallel. Tool calls within a single ticket also run concurrently via `asyncio.gather()`.
@@ -153,7 +156,7 @@ Every resolution includes:
 ### Backend → Railway
 1. Connect your GitHub repo to Railway
 2. Set root directory to `/backend`
-3. Add env var: `ANTHROPIC_API_KEY=sk-ant-...`
+3. Add env var: `NVIDIA_API_KEY=nvapi-...`
 4. Railway auto-detects Python and runs `uvicorn main:app`
 
 ### Frontend → Vercel

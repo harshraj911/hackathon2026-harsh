@@ -1,0 +1,88 @@
+@import 'tailwindcss/base';
+@import 'tailwindcss/components';
+@import 'tailwindcss/utilities';
+
+:root {
+  --brand: #4F6EF7;
+  --brand-dark: #3B57E8;
+  --surface-bg: #0d1117;
+  --surface-card: #141928;
+  --surface-border: #1e2d4a;
+  --text-primary: #e8edf5;
+  --text-secondary: #7a8bad;
+  --text-muted: #4a5568;
+  --success: #22c55e;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+  --info: #06b6d4;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--surface-bg);
+  color: var(--text-primary);
+  font-family: 'DM Sans', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--surface-border);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover { background: var(--brand); }
+
+.font-display { font-family: 'Syne', sans-serif; }
+.font-mono { font-family: 'JetBrains Mono', monospace; }
+
+/* Glow effects */
+.glow-brand {
+  box-shadow: 0 0 20px rgba(79, 110, 247, 0.25);
+}
+.glow-success {
+  box-shadow: 0 0 20px rgba(34, 197, 94, 0.2);
+}
+
+/* Card base */
+.card {
+  background: var(--surface-card);
+  border: 1px solid var(--surface-border);
+  border-radius: 12px;
+}
+
+/* Animated gradient border */
+@keyframes borderGlow {
+  0%, 100% { border-color: var(--surface-border); }
+  50% { border-color: var(--brand); }
+}
+
+.card-active {
+  animation: borderGlow 2s ease-in-out infinite;
+}
+
+/* Status dots */
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+/* Tool call trace styling */
+.trace-line {
+  border-left: 2px solid var(--surface-border);
+  padding-left: 16px;
+  margin-left: 8px;
+}
+.trace-line:last-child {
+  border-color: transparent;
+}
