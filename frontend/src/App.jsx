@@ -8,6 +8,7 @@ import TicketDetail from './pages/TicketDetail'
 import AuditLog from './pages/AuditLog'
 import RunAgent from './pages/RunAgent'
 import DataManagement from './pages/DataManagement'
+import ModelComparison from './pages/ModelComparison'
 
 export default function App() {
   return (
@@ -20,6 +21,7 @@ export default function App() {
           <Route path="/audit"       element={<AuditLog />} />
           <Route path="/run"         element={<RunAgent />} />
           <Route path="/data"        element={<DataManagement />} />
+          <Route path="/compare"     element={<ModelComparison />} />
         </Routes>
       </Layout>
     </RunProvider>

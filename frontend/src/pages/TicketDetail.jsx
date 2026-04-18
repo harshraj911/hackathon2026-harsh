@@ -97,23 +97,50 @@ export default function TicketDetail() {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [running, setRunning] = useState(false)
+  const [replayIndex, setReplayIndex] = useState(-1)
+  const [editing, setEditing] = useState(false)
+  const [correction, setCorrection] = useState({ reasoning: '', resolution: '', customer_message: '' })
+  const [savingCorrection, setSavingCorrection] = useState(false)
 
   const load = async () => {
     setLoading(true)
     try {
       const r = await getTicket(id)
       setData(r.data)
+      if (r.data.audit) {
+        setCorrection({
+          reasoning: r.data.audit.reasoning || '',
+          resolution: r.data.audit.resolution || '',
+          customer_message: r.data.audit.customer_message || ''
+        })
+      }
     } catch { }
     setLoading(false)
   }
 
   const handleRun = async () => {
     setRunning(true)
+    setReplayIndex(-1)
     try {
       await runSingle(id)
       await load()
     } catch { }
     setRunning(false)
+  }
+
+  const handleSaveCorrection = async () => {
+    setSavingCorrection(true)
+    try {
+      const baseUrl = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000'
+      await fetch(`${baseUrl}/tickets/${id}/correction`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(correction)
+      })
+      setEditing(false)
+      alert("Correction saved as improvement example!")
+    } catch { }
+    setSavingCorrection(false)
   }
 
   useEffect(() => { load() }, [id])
@@ -219,13 +246,35 @@ export default function TicketDetail() {
 
           {/* Tool call trace */}
           <div className="card p-5">
-            <h2 className="font-display font-semibold text-sm mb-5" style={{ color: 'var(--text-primary)' }}>
-              Tool Call Chain ({audit.tool_calls?.length ?? 0} calls)
-            </h2>
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="font-display font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>
+                Tool Call Chain ({audit.tool_calls?.length ?? 0} calls)
+              </h2>
+              <div className="flex items-center gap-2 bg-white/5 p-1 rounded-lg">
+                <button 
+                  onClick={() => setReplayIndex(-1)}
+                  className={`px-3 py-1 text-[10px] rounded ${replayIndex === -1 ? 'bg-brand text-white' : 'text-muted'}`}
+                >
+                  LIVE
+                </button>
+                {audit.tool_calls?.map((_, i) => (
+                  <button 
+                    key={i}
+                    onClick={() => setReplayIndex(i)}
+                    className={`w-6 h-6 flex items-center justify-center text-[10px] rounded ${replayIndex === i ? 'bg-brand text-white' : 'text-muted'}`}
+                  >
+                    {i + 1}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             {audit.tool_calls?.length > 0 ? (
               <div className="space-y-0">
                 {audit.tool_calls.map((call, i) => (
-                  <ToolCallCard key={i} call={call} index={i} />
+                  <div key={i} className={replayIndex !== -1 && replayIndex !== i ? 'opacity-20 transition-opacity' : 'transition-opacity'}>
+                    <ToolCallCard call={call} index={i} />
+                  </div>
                 ))}
               </div>
             ) : (
@@ -235,13 +284,41 @@ export default function TicketDetail() {
 
           {/* Reasoning */}
           <div className="card p-5">
-            <h2 className="font-display font-semibold text-sm mb-3" style={{ color: 'var(--text-primary)' }}>
-              Agent Reasoning
-            </h2>
-            <div className="text-sm leading-relaxed whitespace-pre-wrap p-4 rounded-lg"
-              style={{ background: 'rgba(0,0,0,0.2)', color: 'var(--text-secondary)', fontFamily: 'inherit' }}>
-              {audit.reasoning || audit.raw_response || 'No reasoning captured'}
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="font-display font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>
+                Agent Reasoning
+              </h2>
+              <button 
+                onClick={() => setEditing(!editing)}
+                className="text-[10px] text-brand hover:underline"
+              >
+                {editing ? 'Cancel Edit' : 'Suggest Correction'}
+              </button>
             </div>
+            {editing ? (
+              <div className="space-y-3">
+                <textarea 
+                  value={correction.reasoning}
+                  onChange={e => setCorrection({...correction, reasoning: e.target.value})}
+                  className="w-full h-32 p-3 text-xs bg-black/20 border border-white/5 rounded-lg outline-none font-mono"
+                  style={{ color: 'var(--text-secondary)' }}
+                />
+                <div className="flex gap-2">
+                   <button 
+                     onClick={handleSaveCorrection}
+                     disabled={savingCorrection}
+                     className="btn btn-primary text-[10px] py-1"
+                   >
+                     {savingCorrection ? 'Saving...' : 'Save as Improved Example'}
+                   </button>
+                </div>
+              </div>
+            ) : (
+              <div className="text-sm leading-relaxed whitespace-pre-wrap p-4 rounded-lg"
+                style={{ background: 'rgba(0,0,0,0.2)', color: 'var(--text-secondary)', fontFamily: 'inherit' }}>
+                {audit.reasoning || audit.raw_response || 'No reasoning captured'}
+              </div>
+            )}
           </div>
 
           {/* Customer reply */}

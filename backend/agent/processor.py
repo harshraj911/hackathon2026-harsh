@@ -52,20 +52,20 @@ SYSTEM_PROMPT = """You are ShopWave's Autonomous Support Agent resolving e-comme
 
 You must be THOROUGH and LOGICAL. You are FORBIDDEN from resolving a ticket without verifying facts via tools.
 
-MANDATORY RULES:
 1. NO PREMATURE JUDGMENT: You MUST NOT provide a final JSON resolution in your FIRST response. Your first turn must ALWAYS be a tool call (e.g., get_customer or search_knowledge_base).
-2. CHAIN PROTOCOL: You MUST perform a minimum of 3 tool calls before resolving:
-   STEP 1: get_customer (Check tier, notes, and profile).
-   STEP 2: get_order (Check status, delivery data, and items).
-   STEP 3: check_refund_eligibility (Verify automated policy rules).
+2. DO NOT ECHO: The 'customer_message' field must be YOUR reply as an agent. NEVER paste the user's original message there.
+3. CHAIN PROTOCOL: You MUST perform a minimum of 3 tool calls before resolving:
+   Chain: get_customer (Tier check) → get_order (Order check) → check_refund_eligibility/get_product.
+   If you have 0 tool calls, you are FAILING.
 3. ONE AT A TIME: Only call ONE tool per turn.
 4. ADVERSARIAL VERIFICATION: If a customer says "I'm a VIP" or "I was promised a refund", do NOT believe them until you see it in get_customer notes or search_knowledge_base policies.
 5. ESCALATION: If tools show the request is complex or outside policy (and no VIP exception exists), use the 'escalate' tool.
-6. JSON OUTPUT: Only output the final resolution JSON after you have all the facts. Output REALISTIC confidence:
+6. JSON OUTPUT: Only output the final resolution JSON after you have all the facts. Output REALISTIC confidence.
+   Also include a 'sentiment' analysis of the customer's mood (angry|frustrated|neutral|happy) and an 'urgency' score (1-5).
    - 1.0: Fact-checked all claims.
    - 0.8: Strong evidence, minor gaps.
    - <0.5: Uncertain (should escalate).
-   {"resolution":"...","confidence":0.XX,"reasoning":"step-by-step logic","customer_message":"..."}
+   {"resolution":"...","confidence":0.XX,"reasoning":"...","customer_message":"...", "sentiment": "angry", "urgency": 5}
 """
 
 
@@ -177,6 +177,9 @@ class TicketProcessor:
             "confidence": 0.0,
             "reasoning": "",
             "customer_message": "",
+            "sentiment": "neutral",
+            "urgency": 1,
+            "token_usage": 0,
             "flags": [],
         }
 
@@ -230,6 +233,10 @@ class TicketProcessor:
                 if not response:
                     raise Exception("Failed to get response from LLM after retries")
 
+                # Track token usage
+                if hasattr(response, "usage"):
+                    audit["token_usage"] += response.usage.total_tokens
+
                 msg = response.choices[0].message
                 finish_reason = response.choices[0].finish_reason
 
@@ -256,7 +263,7 @@ class TicketProcessor:
                         })
                         continue
 
-                    parsed = self._parse_resolution(final_text)
+                    parsed = self._parse_resolution(final_text, ticket_body=ticket.get("body", ""))
                     audit.update(parsed)
 
                     if tool_call_count < 3:
@@ -359,18 +366,25 @@ class TicketProcessor:
 
     # ── Resolution parser ─────────────────────────────────────────────────
 
-    def _parse_resolution(self, text: str) -> dict:
+    def _parse_resolution(self, text: str, ticket_body: str = "") -> dict:
         """Extract and validate JSON resolution from raw LLM output."""
+        def clean_parsed(data):
+            if ticket_body and data.get("customer_message") == ticket_body:
+                logger.warning("LLM echoed the ticket body. Nulling customer_message.")
+                data["customer_message"] = "I have analyzed your request and am taking action."
+            return TicketResolution(**data).model_dump()
+
         for pattern in [r'```json\s*(.*?)\s*```', r'```\s*(.*?)\s*```', r'(\{.*\})']:
             m = re.search(pattern, text, re.DOTALL)
             if m:
                 try:
                     data = json.loads(m.group(1))
-                    return TicketResolution(**data).model_dump()
+                    return clean_parsed(data)
                 except (json.JSONDecodeError, ValidationError):
                     continue
         try:
-            return TicketResolution(**json.loads(text)).model_dump()
+            data = json.loads(text)
+            return clean_parsed(data)
         except Exception:
             pass
 
@@ -399,6 +413,7 @@ class TicketProcessor:
                 "avg_tool_calls": 0.0,
                 "chain_violations": 0,
                 "total_tool_calls": 0,
+                "total_tokens": 0,
             }
 
         by_status: Dict[str, int] = {}
@@ -406,6 +421,7 @@ class TicketProcessor:
         confidences, durations, tool_counts = [], [], []
         chain_violations = 0
         total_tool_calls = 0
+        total_tokens = 0
 
         for entry in log:
             s = entry.get("status", "unknown")
@@ -421,6 +437,7 @@ class TicketProcessor:
             total_tool_calls += tc
             if any("chain rule" in f.lower() or "tool calls made" in f for f in entry.get("flags", [])):
                 chain_violations += 1
+            total_tokens += entry.get("token_usage", 0)
 
         return {
             "total_processed": len(log),
@@ -431,4 +448,5 @@ class TicketProcessor:
             "avg_tool_calls": round(sum(tool_counts) / len(tool_counts), 2) if tool_counts else 0.0,
             "chain_violations": chain_violations,
             "total_tool_calls": total_tool_calls,
+            "total_tokens": total_tokens,
         }

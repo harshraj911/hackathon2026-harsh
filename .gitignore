@@ -29,3 +29,6 @@ audit_log.json
 # OS
 .DS_Store
 Thumbs.db
+
+
+deployment_guide.md

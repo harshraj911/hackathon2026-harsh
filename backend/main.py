@@ -70,6 +70,11 @@ class DataUpdateRequest(BaseModel):
     filename: str  # tickets.json, orders.json, customers.json, products.json
     content: list[dict]
 
+class CorrectionRequest(BaseModel):
+    reasoning: str
+    resolution: str
+    customer_message: str
+
 
 # ─── HEALTH ───
 
@@ -281,6 +286,40 @@ async def get_stats():
     """Get aggregate statistics across all processed tickets."""
     return processor.get_stats()
 
+@app.post("/tickets/{ticket_id}/correction")
+async def save_correction(ticket_id: str, req: CorrectionRequest):
+    """Save a human-corrected version of a ticket's resolution."""
+    # In a real app, this would go to a database or few-shot-examples.json
+    # For this hackathon, we'll store it in a 'corrections.json' file
+    correction_path = os.path.join(os.getcwd(), "data", "corrections.json")
+    
+    try:
+        data = {}
+        if os.path.exists(correction_path):
+            with open(correction_path, "r") as f:
+                data = json.load(f)
+        
+        data[ticket_id] = {
+            **req.model_dump(),
+            "timestamp": datetime.now().isoformat(),
+            "reviewed_by": "human_operator"
+        }
+        
+        with open(correction_path, "w") as f:
+            json.dump(data, f, indent=2)
+            
+        return {"success": True, "message": "Correction saved for few-shot learning"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to save correction: {e}")
+
+@app.get("/run/compare")
+async def get_comparison_metrics():
+    """Returns placeholder metrics for different model attempts."""
+    return {
+        "llama-3.3-70b": {"accuracy": 0.92, "avg_duration": 4.2, "tps": 12},
+        "llama-3.1-405b": {"accuracy": 0.95, "avg_duration": 12.8, "tps": 4},
+        "nemotron-70b": {"accuracy": 0.89, "avg_duration": 5.1, "tps": 9}
+    }
 
 @app.delete("/audit")
 async def reset_audit():

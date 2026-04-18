@@ -11,6 +11,7 @@ const NAV = [
   { to: '/run',     icon: Play,            label: 'Run Agent' },
   { to: '/tickets', icon: Ticket,          label: 'Tickets' },
   { to: '/audit',   icon: ScrollText,      label: 'Audit Log' },
+  { to: '/compare', icon: Activity,        label: 'Benchmarks' },
   { to: '/data',    icon: Database,        label: 'Data Source' },
 ]
 

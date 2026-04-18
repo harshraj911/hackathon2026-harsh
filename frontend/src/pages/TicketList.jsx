@@ -10,6 +10,7 @@ const RESOLUTION_COLOR = {
 }
 const TIER_COLOR = { vip: '#f59e0b', premium: '#4F6EF7', standard: '#6b7280' }
 const STATUS_COLOR = { completed: '#22c55e', dead_letter: '#ef4444', processing: '#4F6EF7', pending: '#6b7280' }
+const SENTIMENT_COLOR = { happy: '#10b981', neutral: '#a1a1aa', frustrated: '#f59e0b', angry: '#f43f5e' }
 
 export default function TicketList() {
   const [tickets, setTickets] = useState([])
@@ -128,6 +129,7 @@ export default function TicketList() {
                 <Th col="source" label="Source" />
                 <Th col="status" label="Status" />
                 <Th col="resolution" label="Resolution" />
+                <Th col="sentiment" label="Sentiment" />
                 <Th col="confidence" label="Conf." />
                 <th />
               </tr>
@@ -143,8 +145,11 @@ export default function TicketList() {
                 </td></tr>
               ) : filtered.map((ticket, i) => (
                 <tr key={ticket.ticket_id}
-                  style={{ borderBottom: i < filtered.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}
-                  className="hover:bg-white/[0.02] transition-colors">
+                  style={{ 
+                    borderBottom: i < filtered.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none',
+                    boxShadow: ticket.sentiment === 'angry' ? 'inset 4px 0 0 #f43f5e, 0 0 15px rgba(244,63,94,0.05)' : 'none'
+                  }}
+                  className={`hover:bg-white/[0.02] transition-colors ${ticket.sentiment === 'angry' ? 'bg-red-500/5' : ''}`}>
                   <td className="px-4 py-3">
                     <span className="font-mono text-xs font-medium" style={{ color: 'var(--brand)' }}>{ticket.ticket_id}</span>
                   </td>
@@ -174,6 +179,14 @@ export default function TicketList() {
                       <span className="px-2 py-0.5 rounded-full text-xs capitalize"
                         style={{ background: `${RESOLUTION_COLOR[ticket.resolution] || '#555'}20`, color: RESOLUTION_COLOR[ticket.resolution] || '#aaa' }}>
                         {ticket.resolution}
+                      </span>
+                    ) : <span className="text-xs" style={{ color: 'var(--text-muted)' }}>—</span>}
+                  </td>
+                  <td className="px-4 py-3">
+                    {ticket.sentiment ? (
+                      <span className="text-[10px] font-bold uppercase tracking-widest"
+                        style={{ color: SENTIMENT_COLOR[ticket.sentiment] }}>
+                        {ticket.sentiment}
                       </span>
                     ) : <span className="text-xs" style={{ color: 'var(--text-muted)' }}>—</span>}
                   </td>

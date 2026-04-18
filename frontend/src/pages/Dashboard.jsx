@@ -11,16 +11,16 @@ import {
 import { getStats, getTickets } from '../utils/api'
 
 const COLORS = {
-  refunded: '#22c55e',
-  denied: '#ef4444',
+  refunded: '#10b981',
+  denied: '#f43f5e',
   escalated: '#f59e0b',
-  replied: '#06b6d4',
-  cancelled: '#8b5cf6',
-  pending_info: '#6b7280',
-  unknown: '#374151',
+  replied: '#3b82f6',
+  cancelled: '#6366f1',
+  pending_info: '#71717a',
+  unknown: '#3f3f46',
 }
 
-const TIER_COLORS = { vip: '#f59e0b', premium: '#4F6EF7', standard: '#6b7280' }
+const TIER_COLORS = { vip: '#f59e0b', premium: '#6366f1', standard: '#a1a1aa' }
 
 function StatCard({ label, value, sub, icon: Icon, color = 'var(--brand)', trend }) {
   return (
@@ -130,11 +130,15 @@ export default function Dashboard() {
       </div>
 
       {/* Stat cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard label="Total Tickets" value={tickets.length} sub="across all sources" icon={Activity} />
-        <StatCard label="Processed" value={processed.length} sub={`${pending.length} pending`} icon={CheckCircle2} color="var(--success)" />
-        <StatCard label="Escalated" value={escalated.length} sub="to human agents" icon={AlertTriangle} color="var(--warning)" />
-        <StatCard label="Avg Confidence" value={avgConf} sub={`${stats?.total_tool_calls || 0} total tool calls`} icon={TrendingUp} color="#a855f7" />
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatCard label="Total Tickets" value={tickets.length} icon={Activity} />
+        <StatCard label="Token Efficiency" value={`${Math.round((stats?.total_tokens || 0) / (tickets.length || 1))} / tkt`} icon={Zap} color="var(--brand)" />
+        <StatCard label="Avg Resolution Time" value={stats?.avg_duration_ms ? `${(stats.avg_duration_ms / 1000).toFixed(1)}s` : '—'} icon={Clock} color="var(--info)" />
+        <div className="aurora-glow rounded-2xl overflow-hidden p-[1px]">
+          <div className="relative h-full">
+            <StatCard label="Avg Confidence" value={avgConf} sub={`${stats?.total_tool_calls || 0} tool calls`} icon={TrendingUp} color="#a855f7" />
+          </div>
+        </div>
       </div>
 
       {/* Charts row */}
@@ -176,8 +180,31 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* Confidence histogram */}
+        {/* Customer Sentiment */}
         <div className="card p-5">
+           <h3 className="font-display font-semibold text-sm mb-4" style={{ color: 'var(--text-primary)' }}>Customer Sentiment Heatmap</h3>
+           <div className="space-y-4">
+             {['angry', 'frustrated', 'neutral', 'happy'].map(s => {
+               const count = tickets.filter(t => t.sentiment === s).length;
+               const pct = tickets.length > 0 ? (count / tickets.length) * 100 : 0;
+               const colors = { angry: 'var(--danger)', frustrated: 'var(--warning)', neutral: 'var(--text-secondary)', happy: 'var(--success)' };
+               return (
+                 <div key={s}>
+                   <div className="flex justify-between text-xs mb-1 capitalize">
+                     <span style={{ color: colors[s] }}>{s}</span>
+                     <span>{count}</span>
+                   </div>
+                   <div className="h-2 rounded-full bg-white/5 overflow-hidden">
+                     <div className="h-full transition-all duration-700" style={{ width: `${pct}%`, background: colors[s] }} />
+                   </div>
+                 </div>
+               )
+             })}
+           </div>
+        </div>
+
+        {/* Confidence histogram */}
+        <div className="card p-5 lg:col-span-2">
           <h3 className="font-display font-semibold text-sm mb-4" style={{ color: 'var(--text-primary)' }}>
             Confidence Distribution
           </h3>
