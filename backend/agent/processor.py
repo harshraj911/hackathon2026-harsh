@@ -161,9 +161,19 @@ class TicketProcessor:
 
         return {"error": f"{name} failed after {retries+1} attempts"}
 
-    # ── Single ticket ReAct loop ───────────────────────────────────────────
+    async def _log_progress(self, callback, ticket_id, message):
+        """Helper to safely notify UI of progress."""
+        if callback:
+            try:
+                await callback({
+                    "ticket_id": ticket_id,
+                    "status": "processing",
+                    "message": message
+                })
+            except Exception:
+                pass
 
-    async def process_ticket(self, ticket: dict) -> dict:
+    async def process_ticket(self, ticket: dict, progress_callback=None) -> dict:
         ticket_id = ticket["ticket_id"]
         logger.info(f"[{ticket_id}] Starting processing with {MODEL}")
         start_ts = time.time()
@@ -254,6 +264,7 @@ class TicketProcessor:
                     # ENFORCEMENT: If LLM tries to end without tools, force it to work
                     if tool_call_count < 2 and turn < 3:
                         logger.warning(f"[{ticket_id}] LLM tried premature finish at turn {turn}. Forcing tools.")
+                        await self._log_progress(progress_callback, ticket_id, "Hallucination detected! Forcing database lookup...")
                         messages.append({
                             "role": "user", 
                             "content": (
@@ -278,12 +289,13 @@ class TicketProcessor:
                     break
 
                 # Execute all tool calls in this turn concurrently
-                async def run_call(tc):
+                async def execute_and_log(tc):
+                    await self._log_progress(progress_callback, ticket_id, f"Agent is calling {tc.function.name}...")
                     args = json.loads(tc.function.arguments or "{}")
-                    result = await self._execute_tool(tc.function.name, args)
-                    return tc, args, result
+                    res = await self._execute_tool(tc.function.name, args)
+                    return tc, args, res
 
-                call_results = await asyncio.gather(*[run_call(tc) for tc in tool_calls])
+                call_results = await asyncio.gather(*[execute_and_log(tc) for tc in tool_calls])
 
                 for tc, args, result in call_results:
                     tool_call_count += 1
@@ -296,6 +308,8 @@ class TicketProcessor:
                     }
                     audit["steps"].append(step)
                     logger.info(f"[{ticket_id}] Tool {tc.function.name} → {list(result.keys())}")
+
+                    await self._log_progress(progress_callback, ticket_id, f"Verifying {tc.function.name} results...")
 
                     # Append tool result to history
                     messages.append({
