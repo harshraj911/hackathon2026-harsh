@@ -1,8 +1,12 @@
 import axios from 'axios'
 
-const BASE = import.meta.env.VITE_API_URL || '/api'
+let base = import.meta.env.VITE_API_URL || '/api'
+if (base !== '/api' && !base.startsWith('http')) {
+  base = `https://${base}`
+}
 
-const api = axios.create({ baseURL: BASE, timeout: 120000 })
+export const BASE_URL = base
+const api = axios.create({ baseURL: base, timeout: 120000 })
 
 export const getHealth    = () => api.get('/health')
 export const getTickets   = () => api.get('/tickets')

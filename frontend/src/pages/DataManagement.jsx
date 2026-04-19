@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { Save, FileJson, AlertCircle, CheckCircle2, Info } from 'lucide-react'
+import api from '../utils/api'
 
 const FILES = [
   { id: 'tickets.json',   label: 'Tickets Data',   description: 'Core support tickets to be processed.' },
@@ -19,10 +20,8 @@ export default function DataManagement() {
     setLoading(true)
     setMessage(null)
     try {
-      const baseUrl = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000'
-      const r = await fetch(`${baseUrl}/data/files/${file.id}`)
-      const data = await r.json()
-      setContent(JSON.stringify(data, null, 2))
+      const r = await api.get(`/data/files/${file.id}`)
+      setContent(JSON.stringify(r.data, null, 2))
     } catch (err) {
       setMessage({ type: 'error', text: `Failed to load ${file.id}` })
     }
@@ -44,14 +43,10 @@ export default function DataManagement() {
         throw new Error('Invalid JSON format')
       }
 
-      const baseUrl = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000'
-      const r = await fetch(`${baseUrl}/data/files`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ filename: activeFile.id, content: parsed })
+      const r = await api.post('/data/files', {
+        filename: activeFile.id,
+        content: parsed
       })
-      
-      if (!r.ok) throw new Error('Failed to save file')
       
       setMessage({ type: 'success', text: `${activeFile.id} updated successfully!` })
     } catch (err) {

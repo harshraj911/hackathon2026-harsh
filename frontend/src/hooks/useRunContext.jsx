@@ -1,7 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react'
-import axios from 'axios'
-
-const BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+import api, { BASE_URL } from '../utils/api'
 
 const RunContext = createContext(null)
 
@@ -19,7 +17,7 @@ export function RunProvider({ children }) {
   useEffect(() => {
     mountedRef.current = true
     // On first load, sync with whatever the backend says
-    axios.get(`${BASE}/run/status`).then(r => {
+    api.get('/run/status').then(r => {
       if (!mountedRef.current) return
       const d = r.data
       setStatus(d)
@@ -42,7 +40,7 @@ export function RunProvider({ children }) {
     clearInterval(pollRef.current)
     pollRef.current = setInterval(async () => {
       try {
-        const r = await axios.get(`${BASE}/run/status`)
+        const r = await api.get('/run/status')
         if (!mountedRef.current) return
         const d = r.data
         setStatus(d)
@@ -69,7 +67,7 @@ export function RunProvider({ children }) {
     setRunning(true)
 
     try {
-      await axios.post(`${BASE}/run`, { concurrency })
+      await api.post('/run', { concurrency })
     } catch (e) {
       setRunning(false)
       return
@@ -77,7 +75,7 @@ export function RunProvider({ children }) {
 
     // Open SSE for live events
     esRef.current?.close()
-    const es = new EventSource(`${BASE}/run/stream`)
+    const es = new EventSource(`${BASE_URL}/run/stream`)
     esRef.current = es
 
     es.onmessage = (e) => {
@@ -106,7 +104,7 @@ export function RunProvider({ children }) {
 
   const stopRun = useCallback(async () => {
     try {
-      await axios.post(`${BASE}/run/stop`)
+      await api.post('/run/stop')
       setRunning(false)
       clearInterval(pollRef.current)
       esRef.current?.close()
@@ -116,7 +114,7 @@ export function RunProvider({ children }) {
   const reset = useCallback(async () => {
     esRef.current?.close()
     clearInterval(pollRef.current)
-    try { await axios.delete(`${BASE}/audit`) } catch { }
+    try { await api.delete('/audit') } catch { }
     setEvents([])
     setStatus(null)
     setDone(false)

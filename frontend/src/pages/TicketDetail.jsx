@@ -131,12 +131,7 @@ export default function TicketDetail() {
   const handleSaveCorrection = async () => {
     setSavingCorrection(true)
     try {
-      const baseUrl = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000'
-      await fetch(`${baseUrl}/tickets/${id}/correction`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(correction)
-      })
+      await api.post(`/tickets/${id}/correction`, correction)
       setEditing(false)
       alert("Correction saved as improvement example!")
     } catch { }

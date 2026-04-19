@@ -2,6 +2,7 @@ import React from 'react'
 import { Link } from 'react-router-dom'
 import { Play, Square, RefreshCw, CheckCircle2, XCircle, AlertTriangle } from 'lucide-react'
 import { useRun } from '../hooks/useRunContext'
+import { getTickets } from '../utils/api'
 
 const RESOLUTION_COLOR = {
   refunded:        'var(--success)',
@@ -21,9 +22,8 @@ export default function RunAgent() {
 
   const [totalTickets, setTotalTickets] = React.useState(0)
   React.useEffect(() => {
-    fetch(`${import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000'}/tickets`)
-      .then(r => r.json())
-      .then(data => setTotalTickets(data.total || 0))
+    getTickets()
+      .then(r => setTotalTickets(r.data.total || 0))
       .catch(() => setTotalTickets(20))
   }, [])
 

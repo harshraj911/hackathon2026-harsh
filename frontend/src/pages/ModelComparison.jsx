@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
 import { Database, Zap, Clock, ShieldCheck, Activity } from 'lucide-react'
+import api from '../utils/api'
 
 export default function ModelComparison() {
   const [data, setData] = useState(null)
@@ -9,11 +10,11 @@ export default function ModelComparison() {
   useEffect(() => {
     const fetchMetrics = async () => {
       try {
-        const baseUrl = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000'
-        const r = await fetch(`${baseUrl}/run/compare`)
-        const j = await r.json()
-        setData(Object.entries(j).map(([name, metrics]) => ({ name, ...metrics })))
-      } catch {}
+        const r = await api.get('/run/compare')
+        setData(Object.entries(r.data).map(([name, metrics]) => ({ name, ...metrics })))
+      } catch (err) {
+        console.error("Failed to fetch model comparison:", err)
+      }
       setLoading(false)
     }
     fetchMetrics()
