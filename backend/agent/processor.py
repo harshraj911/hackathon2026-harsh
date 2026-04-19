@@ -180,6 +180,7 @@ class TicketProcessor:
             "sentiment": "neutral",
             "urgency": 1,
             "token_usage": 0,
+            "llm_calls": 0,
             "flags": [],
         }
 
@@ -190,6 +191,7 @@ class TicketProcessor:
         ]
 
         tool_call_count = 0
+        llm_call_count = 0
 
         try:
             for turn in range(15):  # safety ceiling
@@ -201,13 +203,17 @@ class TicketProcessor:
                     try:
                         temp_client = OpenAI(base_url=NVIDIA_BASE_URL, api_key=active_key)
 
+                        # ERROR PREVENTION: Force tool choice on the very first turn to prevent hallucinations
+                        # Subsequent turns use "auto" to allow the agent to finish when it's ready.
+                        current_tool_choice = "required" if (turn == 0 and tool_call_count == 0) else "auto"
+
                         response = await asyncio.to_thread(
                             temp_client.chat.completions.create,
                             model=active_model,
                             messages=messages,
                             tools=TOOL_DEFINITIONS,
-                            tool_choice="auto",
-                            temperature=0.2,
+                            tool_choice=current_tool_choice,
+                            temperature=0.1, # Lower temperature for more reliable tool use
                             max_tokens=2048,
                         )
                         break
@@ -230,11 +236,10 @@ class TicketProcessor:
                             continue
                         raise api_err
                 
-                if not response:
-                    raise Exception("Failed to get response from LLM after retries")
-
-                # Track token usage
-                if hasattr(response, "usage"):
+                # Track token usage and calls
+                llm_call_count += 1
+                audit["llm_calls"] = llm_call_count
+                if hasattr(response, "usage") and response.usage:
                     audit["token_usage"] += response.usage.total_tokens
 
                 msg = response.choices[0].message

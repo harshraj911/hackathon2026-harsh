@@ -9,7 +9,7 @@ The agent follows a **Reasoning + Action** loop. For each ticket, it performs mu
 ```mermaid
 graph TD
     A[Incoming Ticket] --> B[System Prompt + Ticket Context]
-    B --> C{LLM Reasoning Turn\nGemini 2.0 Flash}
+    B --> C{LLM Reasoning Turn\nNVIDIA NIM Cluster}
     C -->|Tool Call| D[Tool Router]
     D -->|Retry on failure| E[Mock Tool Execution]
     E -->|Tool Result| C
@@ -23,7 +23,7 @@ graph TD
 
 | Rule | Implementation |
 |------|---------------|
-| **Chain** (≥3 tool calls) | System prompt enforces: `get_customer → get_order → get_product` minimum chain. Violations are flagged in audit. |
+| **Chain** (≥3 tool calls) | **Hallucination Shield**: `tool_choice="required"` forces at least one call on Turn 0. Logic prevents final resolution until data is fetched. |
 | **Recover** | `_execute_tool` retries once with exponential backoff. ToolError, TimeoutError, and general exceptions are all caught and returned as structured error payloads. |
 | **Concurrency** | `asyncio.Semaphore(concurrency_limit)` in `process_all_tickets` processes tickets in parallel (default: 5 concurrent). |
 | **Explain** | Every tool call, its inputs, outputs, and timestamp are logged in `audit["steps"]`. Final JSON includes `reasoning` and `confidence`. |
@@ -32,7 +32,12 @@ graph TD
 
 ### A. Core Processor (`agent/processor.py`)
 The "Brain" of the system.
-- **LLM**: `gemini-2.0-flash` via the `google-genai` Python SDK
+- **LLM**: `llama-3.3-70b-instruct` via the **NVIDIA NIM** cluster
+- **Hallucination Shield**: On the very first turn (`turn 0`), the processor sets `tool_choice="required"`, making it mathematically impossible for the LLM to give an answer without selecting a tool first.
+- The system prompt explicitly mandates the minimum chain: `get_customer → get_order → get_product`.
+- After the ReAct loop completes, `process_ticket()` checks `tool_call_count < 3`.
+- If violated, a warning flag is appended: `"WARNING: only N tool calls made (minimum 3 required)"`.
+- This flag is stored in the audit log's `"flags"` array and returned in every API response for full transparency.
 - **ReAct Loop**: Multi-turn conversation with the model, alternating tool calls and text responses, up to 15 turns
 - **Tool Retry**: Failed tools are retried once with a 0.5s backoff before returning a structured error payload
 - **State Management**: Per-ticket message history appended each turn; `asyncio.Lock` protects the shared audit log during concurrent writes
