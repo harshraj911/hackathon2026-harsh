@@ -372,6 +372,18 @@ class TicketProcessor:
             if ticket_body and data.get("customer_message") == ticket_body:
                 logger.warning("LLM echoed the ticket body. Nulling customer_message.")
                 data["customer_message"] = "I have analyzed your request and am taking action."
+            
+            # Normalize resolution for dashboard categories
+            res = str(data.get("resolution", "")).lower()
+            if any(w in res for w in ["refund", "money back", "reimburse"]):
+                data["resolution"] = "refunded"
+            elif any(w in res for w in ["escalat", "human", "supervisor", "support team"]):
+                data["resolution"] = "escalated"
+            elif any(w in res for w in ["policy", "explain", "guideline", "standard"]):
+                data["resolution"] = "policy_explained"
+            elif any(w in res for w in ["cancel", "stop"]):
+                data["resolution"] = "cancelled"
+            
             return TicketResolution(**data).model_dump()
 
         for pattern in [r'```json\s*(.*?)\s*```', r'```\s*(.*?)\s*```', r'(\{.*\})']:
