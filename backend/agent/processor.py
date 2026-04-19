@@ -198,21 +198,18 @@ class TicketProcessor:
                 # Call LLM in a thread (openai SDK is sync), retry on 429
                 max_retries = len(FALLBACK_CONFIGS) * 2  # Allows us to cycle through all models twice
                 response = None
+                last_err = ""
                 for api_attempt in range(max_retries):
                     active_key, active_model = FALLBACK_CONFIGS[api_attempt % len(FALLBACK_CONFIGS)]
                     try:
                         temp_client = OpenAI(base_url=NVIDIA_BASE_URL, api_key=active_key)
-
-                        # ERROR PREVENTION: Force tool choice on the very first turn to prevent hallucinations
-                        # Subsequent turns use "auto" to allow the agent to finish when it's ready.
-                        current_tool_choice = "required" if (turn == 0 and tool_call_count == 0) else "auto"
 
                         response = await asyncio.to_thread(
                             temp_client.chat.completions.create,
                             model=active_model,
                             messages=messages,
                             tools=TOOL_DEFINITIONS,
-                            tool_choice=current_tool_choice,
+                            tool_choice="auto",
                             temperature=0.1, # Lower temperature for more reliable tool use
                             max_tokens=2048,
                         )
